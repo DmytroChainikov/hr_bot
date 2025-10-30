@@ -1,0 +1,250 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Новий",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 2,
+      "name": "Інтервʼю",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 3,
+      "name": "Тестове завдання",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 4,
+      "name": "Фінальне інтервʼю",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 5,
+      "name": "Відмова компанії",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 6,
+      "name": "Резерв",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 10,
+      "name": "Відправлено офер",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 11,
+      "name": "Дзвінок",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 13,
+      "name": "Відмова кандидата",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 15,
+      "name": "Немає відповіді",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 16,
+      "name": "Перше повідомлення",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 17,
+      "name": "Відповідь кандидата",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 18,
+      "name": "Технічна співбесіда",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 19,
+      "name": "Технічне інтервʼю",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 20,
+      "name": "Прийнято офер",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 23,
+      "name": "Надіслано LinkedIn invite",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 24,
+      "name": "Надіслано Email",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 25,
+      "name": "Відхилив офер",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 26,
+      "name": "Запізнився на співбесіду",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 27,
+      "name": "Не влаштовує розташування офісу",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 28,
+      "name": "Не сподобався HR",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 29,
+      "name": "Не влаштовує рівень ЗП",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 30,
+      "name": "Не достатньо досвіду",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 31,
+      "name": "Провалив тестове завдання",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 32,
+      "name": "Не вибрано",
+      "parent_id": 5,
+      "parent_name": "Відмова компанії"
+    },
+    {
+      "id": 33,
+      "name": "За нашою ініціативою",
+      "parent_id": 5,
+      "parent_name": "Відмова компанії"
+    },
+    {
+      "id": 34,
+      "name": "Немає відповіді",
+      "parent_id": 5,
+      "parent_name": "Відмова компанії"
+    },
+    {
+      "id": 35,
+      "name": "Тестове",
+      "parent_id": 5,
+      "parent_name": "Відмова компанії"
+    },
+    {
+      "id": 36,
+      "name": "Не вибрано",
+      "parent_id": 13,
+      "parent_name": "Відмова кандидата"
+    },
+    {
+      "id": 37,
+      "name": "Відхилив офер",
+      "parent_id": 13,
+      "parent_name": "Відмова кандидата"
+    },
+    {
+      "id": 38,
+      "name": "Інше",
+      "parent_id": 13,
+      "parent_name": "Відмова кандидата"
+    },
+    {
+      "id": 39,
+      "name": "Відправлено на філіал",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 40,
+      "name": "На стажуванні",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 41,
+      "name": "Співбесіда",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 42,
+      "name": "Заробітна плата",
+      "parent_id": 13,
+      "parent_name": "Відмова кандидата"
+    },
+    {
+      "id": 43,
+      "name": "Не актуально",
+      "parent_id": 13,
+      "parent_name": "Відмова кандидата"
+    },
+    {
+      "id": 44,
+      "name": "без відповіді",
+      "parent_id": 5,
+      "parent_name": "Відмова компанії"
+    },
+    {
+      "id": 45,
+      "name": "графік роботи",
+      "parent_id": 5,
+      "parent_name": "Відмова компанії"
+    },
+    {
+      "id": 46,
+      "name": "Без відповіді",
+      "parent_id": null,
+      "parent_name": null
+    },
+    {
+      "id": 47,
+      "name": "Графік",
+      "parent_id": 13,
+      "parent_name": "Відмова кандидата"
+    },
+    {
+      "id": 48,
+      "name": "Співбесіда з керівником",
+      "parent_id": null,
+      "parent_name": null
+    }
+  ]
+}
