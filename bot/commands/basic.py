@@ -12,9 +12,117 @@ logger = create_logger(__name__)
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обробник команди /start"""
     welcome_message = """
-👋 <b>Привіт! Я бот для аналітики роботи HR.</b>
+👋 <b>Привіт! Я головний рекрутер вашої команди!</b>
 
-📊 Доступні команди:
+🤖 <b>Я можу спілкуватися як людина:</b>
+• Просто напиши мені повідомлення - я відповім
+• Надішли звіт - я його проаналізую
+• Запитай про роботу - я дам пораду
+• Обговори кандидата - я допоможу
+
+� <b>Розумію природні фрази як команди:</b>
+• "Дай звіт за сьогодні" → покажу звіт
+• "Покажи статистику вакансій" → відкрию аналітику
+• "Список вакансій" → покажу всі вакансії
+• "Допомога" → покажу всі можливості
+
+📊 <b>Команди (можна і без /):</b>
+
+<b>Звіти:</b>
+/today - Звіт за сьогодні
+/yesterday - Звіт за вчора
+/report DD.MM.YYYY - Звіт за дату
+/my_report [Ім'я] - Персональний звіт
+
+<b>Аналітика:</b>
+/vacancy_analytics - Статистика по вакансіях
+/vacancies - Список вакансій
+
+<b>Управління:</b>
+/cache_info - Стан кешу
+/clear_cache - Очистити кеш
+/help - Детальна допомога
+
+� <b>Приклади розмови:</b>
+• "Привіт! Як справи?"
+• "Сьогодні створив 3 кандидати"
+• "Як покращити конверсію?"
+• "Дай звіт за сьогодні"
+
+✨ <b>Працюю на AI - розумію тебе!</b>
+"""
+    await update.message.reply_text(welcome_message, parse_mode='HTML')
+
+
+@require_group_topic
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробник команди /help"""
+    help_message = """
+📖 <b>Довідка по роботі з ботом:</b>
+
+🤖 <b>Природне спілкування:</b>
+Пиши мені як людині - я розумію!
+
+<b>Замість команд можна писати:</b>
+• "Дай звіт за сьогодні" → /today
+• "Покажи статистику вакансій" → /vacancy_analytics
+• "Список вакансій" → /vacancies
+• "Звіт за вчора" → /yesterday
+• "Очисти кеш" → /clear_cache
+• "Допомога" → /help
+
+━━━━━━━━━━━━━━━━━━━━
+
+<b>📊 Звіти:</b>
+/today - Звіт за сьогодні
+/yesterday - Звіт за вчора
+/report DD.MM.YYYY - Звіт за дату
+/my_report [Ім'я] - Персональний звіт
+
+<b>📊 Аналітика:</b>
+/vacancy_analytics - Детальна статистика
+/vacancies - Список вакансій
+
+<b>🔧 Управління:</b>
+/cache_info - Інфо про кеш
+/clear_cache - Очистити кеш
+/chat_info - Інфо про чат
+
+━━━━━━━━━━━━━━━━━━━━
+
+💬 <b>Приклади розмови:</b>
+• "Привіт! Що думаєш про мої результати?"
+• "Сьогодні провів 5 інтерв'ю, створив 3 кандидати"
+• "Що робити з кандидатом який не відповідає?"
+• "Як покращити швидкість найму?"
+
+✨ <b>Google Gemini AI розуміє контекст!</b>
+Просто пиши - я завжди допоможу 💪
+"""
+    await update.message.reply_text(help_message, parse_mode='HTML')
+
+from telegram import Update
+from telegram.ext import ContextTypes
+
+from core.logger_settings import create_logger
+from bot.commands.decorators import require_group_topic
+
+logger = create_logger(__name__)
+
+
+@require_group_topic
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробник команди /start"""
+    welcome_message = """
+👋 <b>Привіт! Я головний рекрутер вашої команди!</b>
+
+🤖 <b>Я можу спілкуватися як людина:</b>
+• Просто напиши мені повідомлення - я відповім
+• Надішли звіт - я його проаналізую
+• Запитай про роботу - я дам пораду
+• Обговори кандидата - я допоможу
+
+📊 <b>Також доступні команди:</b>
 
 <b>Звіти:</b>
 /today - Звіт за сьогодні
@@ -36,11 +144,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /chat_info - Інформація про чат та топік
 /help - Детальна допомога
 
-Приклади:
-• /report 28.10.2025
-• /add_vacancy 12345 Senior Python Developer
+💬 <b>Приклади спілкування:</b>
+• "Привіт, як справи?"
+• "Сьогодні створив 5 кандидатів на позицію Python Developer"
+• "Що думаєш про результати за тиждень?"
+• "Як покращити конверсію на етапі інтерв'ю?"
 
-💡 Звіти формуються тільки по відстежуваних вакансіях
+✨ <b>Я використовую AI для природного спілкування!</b>
 """
     await update.message.reply_text(welcome_message, parse_mode='HTML')
 

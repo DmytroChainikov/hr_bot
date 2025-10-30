@@ -44,6 +44,9 @@ class Config:
     HURMA_PASSWORD = os.getenv("HURMA_PASSWORD")
     HURMA_COMPANY = os.getenv("HURMA_COMPANY", "yourcompany")
     
+    # Gemini AI
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    
     # HRs
     HRS_RAW = os.getenv("HRS", "")
     

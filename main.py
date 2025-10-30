@@ -1,13 +1,22 @@
 """Головний файл запуску HR Analytics бота"""
 import asyncio
 from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import (
+    Application, 
+    CommandHandler, 
+    CallbackQueryHandler, 
+    MessageHandler,
+    filters,
+    ContextTypes
+)
 
 from core.config import Config
 from core.logger_settings import create_logger
 from core.analytics import AnalyticsService
 from services.hurma_service import HurmaService
 from services.binotel_service import BinotelService
+from services.gemini_service import GeminiService
+from bot.conversation_handler import ConversationHandler
 from bot.commands import (
     start_command,
     help_command,
@@ -19,8 +28,6 @@ from bot.commands import (
     cache_info_command,
     clear_cache_command,
     list_vacancies_command,
-    add_vacancy_command,
-    remove_vacancy_command,
     vacancy_analytics_command,
     vacancy_stats_callback,
 )
@@ -53,10 +60,23 @@ async def post_init(application: Application):
     binotel_service = BinotelService(Config.BINOTEL_KEY, Config.BINOTEL_SECRET)
     analytics_service = AnalyticsService(hurma_service, binotel_service)
     
+    # Ініціалізуємо Gemini AI сервіс
+    try:
+        gemini_service = GeminiService()
+        conversation_handler = ConversationHandler(gemini_service, analytics_service)
+        logger.info("✅ Gemini AI сервіс ініціалізовано")
+    except Exception as e:
+        logger.warning(f"⚠️ Не вдалося ініціалізувати Gemini: {e}")
+        logger.warning("Бот працюватиме без AI функцій")
+        gemini_service = None
+        conversation_handler = None
+    
     # Зберігаємо в контексті бота
     application.bot_data['hurma'] = hurma_service
     application.bot_data['binotel'] = binotel_service
     application.bot_data['analytics'] = analytics_service
+    application.bot_data['gemini'] = gemini_service
+    application.bot_data['conversation_handler'] = conversation_handler
     
     logger.info("Сервіси успішно ініціалізовані")
     
@@ -114,14 +134,62 @@ def main():
         application.add_handler(CommandHandler("cache_info", cache_info_command))
         application.add_handler(CommandHandler("clear_cache", clear_cache_command))
         application.add_handler(CommandHandler("vacancies", list_vacancies_command))
-        application.add_handler(CommandHandler("add_vacancy", add_vacancy_command))
-        application.add_handler(CommandHandler("remove_vacancy", remove_vacancy_command))
         application.add_handler(CommandHandler("vacancy_analytics", vacancy_analytics_command))
         
         # Реєструємо обробники callback (для inline кнопок)
         application.add_handler(CallbackQueryHandler(
             vacancy_stats_callback,
             pattern=r'^vacancy_stats:'
+        ))
+        
+        # Реєструємо обробник звичайних повідомлень (для AI розмов)
+        # MessageHandler повинен бути ОСТАННІМ, щоб команди оброблялись першими
+        async def message_handler_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обгортка для обробника повідомлень з перевіркою топіку"""
+            # Перевіряємо доступ до групи та топіку
+            allowed_groups = Config.get_allowed_group_ids()
+            allowed_topics = Config.get_allowed_topic_ids()
+            
+            chat = update.effective_chat
+            message = update.message
+            
+            if not chat or not message:
+                return
+            
+            chat_id = chat.id
+            topic_id = message.message_thread_id
+            
+            # Перевіряємо групу
+            if allowed_groups and chat_id not in allowed_groups:
+                logger.warning(f"Доступ заборонено з чату {chat_id}")
+                return
+            
+            # Перевіряємо топік
+            if allowed_topics:
+                if topic_id is None:
+                    logger.warning(f"Повідомлення не з топіка в чаті {chat_id}")
+                    return
+                
+                if topic_id not in allowed_topics:
+                    logger.warning(f"Доступ заборонено з топіка {topic_id} в чаті {chat_id}")
+                    return
+            
+            # Якщо перевірки пройдені - обробляємо повідомлення
+            conversation_handler = context.bot_data.get('conversation_handler')
+            if conversation_handler:
+                await conversation_handler.handle_message(update, context)
+            else:
+                # Якщо Gemini не доступний, показуємо список команд
+                await update.message.reply_text(
+                    "🤖 AI функції недоступні. Використовуй команди:\n"
+                    "/help - список команд\n"
+                    "/today - звіт за сьогодні\n"
+                    "/vacancy_analytics - аналітика по вакансіях"
+                )
+        
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            message_handler_wrapper
         ))
         
         # Обробник помилок
