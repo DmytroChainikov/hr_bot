@@ -70,7 +70,11 @@ class BinotelService:
         response = requests.get(url, headers=self.headers, json=params, timeout=30)
         
         if response.ok:
-            return response.json()
+            result = response.json()
+            # Якщо callDetails відсутній, повертаємо порожній словник
+            if 'callDetails' not in result or result['callDetails'] is None:
+                result['callDetails'] = {}
+            return result
         else:
             raise Exception(f"Error getting outgoing calls: {response.status_code} - {response.text}")
 
@@ -80,7 +84,11 @@ class BinotelService:
         response = requests.get(url, headers=self.headers, json=params, timeout=30)
         
         if response.ok:
-            return response.json()
+            result = response.json()
+            # Якщо callDetails відсутній, повертаємо порожній словник
+            if 'callDetails' not in result or result['callDetails'] is None:
+                result['callDetails'] = {}
+            return result
         else:
             raise Exception(f"Error getting incoming calls: {response.status_code} - {response.text}")
 
@@ -216,7 +224,17 @@ class BinotelService:
         try:
             outgoing_calls = self._get_outgoing_calls(params)
             incoming_calls = self._get_incoming_calls(params)
-            incoming_calls["callDetails"] = incoming_calls["callDetails"] | outgoing_calls["callDetails"]
+            
+            # Перевіряємо наявність callDetails у обох відповідях
+            out_details = outgoing_calls.get("callDetails") or {}
+            in_details = incoming_calls.get("callDetails") or {}
+            
+            # Об'єднуємо дзвінки
+            if isinstance(out_details, dict) and isinstance(in_details, dict):
+                incoming_calls["callDetails"] = in_details | out_details
+            else:
+                incoming_calls["callDetails"] = {}
+                
             return incoming_calls
 
         except Exception as e:

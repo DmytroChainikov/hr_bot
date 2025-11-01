@@ -1,0 +1,87 @@
+{
+    "data": {
+        "job_opening_title": "МП, Хмельницький",
+        "stages": [
+            {
+                "id": 1,
+                "stage_name": "New",
+                "position": 1
+            },
+            {
+                "id": 6,
+                "stage_name": "Reserve",
+                "position": 2
+            },
+            {
+                "id": 2,
+                "stage_name": "Job interview",
+                "position": 3
+            },
+            {
+                "id": 46,
+                "stage_name": "Без відповіді",
+                "position": 4
+            },
+            {
+                "id": 18,
+                "stage_name": "Technical call",
+                "position": 5
+            },
+            {
+                "id": 39,
+                "stage_name": "Відправлено на філіал",
+                "position": 6
+            },
+            {
+                "id": 40,
+                "stage_name": "На стажуванні",
+                "position": 7
+            },
+            {
+                "id": 20,
+                "stage_name": "Offer accepted",
+                "position": 8
+            },
+            {
+                "id": 13,
+                "stage_name": "Rejection by candidate",
+                "position": 9
+            },
+            {
+                "id": 36,
+                "stage_name": "Rejection by candidate. Not selected",
+                "position": 10
+            },
+            {
+                "id": 42,
+                "stage_name": "Rejection by candidate. Заробітна плата",
+                "position": 11
+            },
+            {
+                "id": 43,
+                "stage_name": "Rejection by candidate. Не актуально",
+                "position": 12
+            },
+            {
+                "id": 38,
+                "stage_name": "Rejection by candidate. Other",
+                "position": 13
+            },
+            {
+                "id": 5,
+                "stage_name": "Rejection by company",
+                "position": 14
+            },
+            {
+                "id": 32,
+                "stage_name": "Rejection by company. Not selected",
+                "position": 15
+            },
+            {
+                "id": 33,
+                "stage_name": "Rejection by company. By our decision",
+                "position": 16
+            }
+        ]
+    }
+}

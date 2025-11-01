@@ -6,6 +6,7 @@ from datetime import datetime, date
 from core.logger_settings import create_logger
 from services.gemini_service import GeminiService
 from core.analytics import AnalyticsService
+from core.config import Config
 
 logger = create_logger(__name__)
 
@@ -142,15 +143,9 @@ class ConversationHandler:
         if any(pattern in text_lower for pattern in vacancy_patterns):
             return ('vacancy_analytics', {})
         
-        # Список вакансій
-        list_patterns = [
-            'список вакансій',
-            'які вакансії',
-            'покажи вакансії',
-            'вакансії список'
-        ]
-        if any(pattern in text_lower for pattern in list_patterns):
-            return ('vacancies', {})
+        # Список вакансій - ВИДАЛЕНО
+        # Тепер запити "скільки вакансій", "які активні вакансії" обробляються через AI function calling
+        # Це дозволяє AI викликати get_active_vacancies для отримання реальних даних з Hurma
         
         # Допомога
         help_patterns = [
@@ -258,7 +253,6 @@ class ConversationHandler:
                     help_command,
                     cache_info_command,
                     clear_cache_command,
-                    list_vacancies_command,
                     vacancy_analytics_command
                 )
                 
@@ -266,7 +260,7 @@ class ConversationHandler:
                     'today': today_command,
                     'yesterday': yesterday_command,
                     'vacancy_analytics': vacancy_analytics_command,
-                    'vacancies': list_vacancies_command,
+                    # 'vacancies' видалено - обробляється через AI function calling
                     'help': help_command,
                     'cache_info': cache_info_command,
                     'clear_cache': clear_cache_command,
@@ -283,16 +277,153 @@ class ConversationHandler:
             # Витягуємо контекст з повідомлення
             msg_context = self._extract_context_from_message(text)
             
+            # Ініціалізуємо змінні для аналізу звіту (щоб уникнути UnboundLocalError)
+            hidden_analysis = None
+            hr_info = None
+            
             # Визначаємо тип повідомлення та відповідаємо
             if msg_context['is_report']:
                 # Це звіт - аналізуємо його
                 logger.info(f"Повідомлення розпізнано як звіт від {user_name}")
                 
-                response = await self.gemini.analyze_report(
-                    report_text=text,
-                    user_name=user_name,
-                    context_info=msg_context
-                )
+                # ПРИХОВАНЕ: Перевіряємо чи це HR з конфігурації
+                hr_info = Config.get_hr_by_telegram_id(user_id)
+                
+                if hr_info:
+                    # Це звіт від зареєстрованого HR - робимо приховане порівняння
+                    try:
+                        # Отримуємо дані з Hurma за сьогодні
+                        today = date.today()
+                        system_data = await self.analytics.get_analytics_for_date(
+                            target_date=today,
+                            hr_id=hr_info.hurma_id
+                        )
+                        
+                        # Виконуємо приховане порівняння (НЕ показується HR!)
+                        hidden_analysis = await self.gemini.compare_hr_report_with_system(
+                            hr_report=text,
+                            system_data=system_data,
+                            hr_name=hr_info.name,
+                            user_id=user_id,
+                            period="today"
+                        )
+                        
+                        # Логуємо приховані результати
+                        logger.warning(
+                            f"[ПРИХОВАНО] Аналіз звіту {hr_info.name}:\n"
+                            f"  Точність: {hidden_analysis.get('accuracy_score', 0)}%\n"
+                            f"  Розбіжностей: {len(hidden_analysis.get('discrepancies', []))}\n"
+                            f"  Чесність даних: {hidden_analysis.get('quality_metrics', {}).get('data_honesty', 0)}%\n"
+                            f"  Рекомендації: {hidden_analysis.get('recommendations', 'Немає')}"
+                        )
+                        
+                        # Якщо точність низька - додатково повідомляємо адміна
+                        if hidden_analysis.get('accuracy_score', 100) < 70:
+                            admin_chat_id = Config.ADMIN_CHAT_ID
+                            if admin_chat_id:
+                                admin_message = (
+                                    f"⚠️ <b>УВАГА: Низька точність звіту</b>\n\n"
+                                    f"HR: {hr_info.name}\n"
+                                    f"Точність: {hidden_analysis.get('accuracy_score', 0)}%\n"
+                                    f"Чесність даних: {hidden_analysis.get('quality_metrics', {}).get('data_honesty', 0)}%\n\n"
+                                    f"<b>Розбіжності:</b>\n"
+                                )
+                                
+                                for disc in hidden_analysis.get('discrepancies', [])[:3]:  # Перші 3
+                                    admin_message += (
+                                        f"• {disc.get('field', 'Поле')}: "
+                                        f"HR повідомив {disc.get('hr_reported', '?')}, "
+                                        f"система {disc.get('system_actual', '?')}\n"
+                                    )
+                                
+                                admin_message += f"\n<b>Рекомендації:</b>\n{hidden_analysis.get('recommendations', 'Немає')}"
+                                
+                                try:
+                                    await context.bot.send_message(
+                                        chat_id=int(admin_chat_id),
+                                        text=admin_message,
+                                        parse_mode='HTML'
+                                    )
+                                except Exception as admin_err:
+                                    logger.error(f"Не вдалося відправити повідомлення адміну: {admin_err}")
+                    
+                    except Exception as compare_error:
+                        logger.error(f"Помилка прихованого порівняння звіту: {compare_error}", exc_info=True)
+                
+                # Формуємо відповідь з результатами аналізу
+                if hidden_analysis and hr_info:
+                    accuracy = hidden_analysis.get('accuracy_score', 0)
+                    discrepancies = hidden_analysis.get('discrepancies', [])
+                    quality = hidden_analysis.get('quality_metrics', {})
+                    
+                    # Визначаємо емоджі за точністю
+                    if accuracy >= 90:
+                        emoji = "🌟"
+                        status = "Відмінно"
+                    elif accuracy >= 75:
+                        emoji = "👍"
+                        status = "Добре"
+                    elif accuracy >= 60:
+                        emoji = "👌"
+                        status = "Задовільно"
+                    else:
+                        emoji = "⚠️"
+                        status = "Потребує уваги"
+                    
+                    response = (
+                        f"{emoji} <b>Звіт прийнято - {status}</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"📊 <b>Точність:</b> {accuracy}%\n"
+                    )
+                    
+                    if quality:
+                        data_honesty = quality.get('data_honesty', 0)
+                        completeness = quality.get('completeness', 0)
+                        
+                        if data_honesty:
+                            response += f"✅ <b>Достовірність:</b> {data_honesty}%\n"
+                        if completeness:
+                            response += f"📋 <b>Повнота:</b> {completeness}%\n"
+                    
+                    if discrepancies and len(discrepancies) > 0:
+                        response += f"\n⚠️ <b>Виявлено {len(discrepancies)} розбіжностей</b>\n"
+                        for i, disc in enumerate(discrepancies[:2], 1):
+                            field = disc.get('field', 'Поле')
+                            hr_val = disc.get('hr_reported', '?')
+                            sys_val = disc.get('system_actual', '?')
+                            response += f"  {i}. {field}: ваш звіт={hr_val}, система={sys_val}\n"
+                        
+                        if len(discrepancies) > 2:
+                            response += f"  ... та ще {len(discrepancies) - 2}\n"
+                    else:
+                        response += "\n✅ <b>Дані співпадають з системою!</b>\n"
+                    
+                    response += (
+                        f"\n💡 <b>Підказка:</b> Продовжуйте фіксувати всю активність у Hurma.\n"
+                        f"Можете перевірити звіт детальніше командою /hr_diff"
+                    )
+                    
+                    # Зберігаємо звіт
+                    if not hasattr(context.bot_data, 'hr_reports'):
+                        context.bot_data['hr_reports'] = {}
+                    
+                    today_key = date.today().strftime('%Y-%m-%d')
+                    if today_key not in context.bot_data['hr_reports']:
+                        context.bot_data['hr_reports'][today_key] = {}
+                    
+                    context.bot_data['hr_reports'][today_key][user_id] = {
+                        'text': text,
+                        'timestamp': datetime.now().isoformat(),
+                        'hr_name': hr_info.name,
+                        'analysis': hidden_analysis
+                    }
+                else:
+                    # Показуємо звичайний AI аналіз (без порівняння)
+                    response = await self.gemini.analyze_report(
+                        report_text=text,
+                        user_name=user_name,
+                        context_info=msg_context
+                    )
             else:
                 # Звичайна розмова
                 logger.info(f"Повідомлення розпізнано як розмова від {user_name}")
@@ -304,8 +435,13 @@ class ConversationHandler:
                     context_info=msg_context
                 )
             
-            # Відправляємо відповідь
-            await message.reply_text(response, parse_mode='Markdown')
+            # Відправляємо відповідь з правильним parse_mode
+            # Для автоматичного аналізу використовуємо HTML, для AI чату - Markdown
+            if hidden_analysis and hr_info and msg_context['is_report']:
+                print(response)
+                await message.reply_text(response, parse_mode='HTML')
+            else:
+                await message.reply_text(response, parse_mode='Markdown')
             
             logger.info(f"Відправлено відповідь користувачу {user_name}")
             

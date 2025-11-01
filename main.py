@@ -31,7 +31,36 @@ from bot.commands import (
     vacancy_analytics_command,
     vacancy_stats_callback,
 )
+from bot.handlers import (
+    diff_command,
+    hr_diff_command,
+    mark_report_command,
+    report_status_command,
+)
+from bot.commands.vacancy_progress import (
+    vacancy_progress_command,
+    vacancy_stagnant_command,
+)
+from bot.commands.funnel_tracking import (
+    funnel_health_command,
+    track_changes_command,
+)
+from bot.commands.topic_management import (
+    register_topic_command,
+    topic_stats_command,
+    inactive_topics_command,
+    topic_info_command,
+    list_topics_command,
+)
+from bot.commands.vacancy_activity_commands import (
+    vacancy_activity_command,
+    inactive_vacancies_command,
+    vacancies_no_calls_command,
+)
+from core.topic_activity_tracker import TopicActivityTracker
 from schedulers import setup_scheduler
+from schedulers.inactive_topics_check import setup_inactive_topics_scheduler
+from schedulers.vacancy_activity_check import setup_vacancy_activity_scheduler
 
 logger = create_logger(__name__)
 
@@ -60,11 +89,24 @@ async def post_init(application: Application):
     binotel_service = BinotelService(Config.BINOTEL_KEY, Config.BINOTEL_SECRET)
     analytics_service = AnalyticsService(hurma_service, binotel_service)
     
-    # Ініціалізуємо Gemini AI сервіс
+    # Створюємо додаткові сервіси для Function Calling
+    from core.candidate_flow_tracker import CandidateFlowTracker
+    from core.vacancy_activity_monitor import VacancyActivityMonitor
+    
+    candidate_flow_tracker = CandidateFlowTracker(hurma_service)
+    vacancy_activity_monitor = VacancyActivityMonitor(hurma_service, binotel_service)
+    
+    # Ініціалізуємо Gemini AI сервіс з Function Calling
     try:
-        gemini_service = GeminiService()
+        gemini_service = GeminiService(
+            hurma_service=hurma_service,
+            binotel_service=binotel_service,
+            analytics=analytics_service,
+            vacancy_activity_monitor=vacancy_activity_monitor,
+            candidate_flow_tracker=candidate_flow_tracker
+        )
         conversation_handler = ConversationHandler(gemini_service, analytics_service)
-        logger.info("✅ Gemini AI сервіс ініціалізовано")
+        logger.info("✅ Gemini AI сервіс ініціалізовано з Function Calling")
     except Exception as e:
         logger.warning(f"⚠️ Не вдалося ініціалізувати Gemini: {e}")
         logger.warning("Бот працюватиме без AI функцій")
@@ -77,6 +119,16 @@ async def post_init(application: Application):
     application.bot_data['analytics'] = analytics_service
     application.bot_data['gemini'] = gemini_service
     application.bot_data['conversation_handler'] = conversation_handler
+    application.bot_data['candidate_flow_tracker'] = candidate_flow_tracker
+    application.bot_data['vacancy_activity_monitor'] = vacancy_activity_monitor
+    
+    # Ініціалізуємо трекер активності топіків
+    try:
+        topic_tracker = TopicActivityTracker()
+        application.bot_data['topic_tracker'] = topic_tracker
+        logger.info("✅ TopicActivityTracker ініціалізовано")
+    except Exception as e:
+        logger.error(f"❌ Помилка ініціалізації TopicActivityTracker: {e}")
     
     logger.info("Сервіси успішно ініціалізовані")
     
@@ -101,6 +153,39 @@ async def post_init(application: Application):
     except Exception as e:
         logger.error(f"❌ Помилка запуску scheduler: {e}")
         # Не критична помилка - продовжуємо роботу бота
+    
+    # Запускаємо scheduler для перевірки звітів HR
+    try:
+        from schedulers import setup_hr_report_check_scheduler
+        hr_report_scheduler = await setup_hr_report_check_scheduler(application)
+        application.bot_data['hr_report_check_scheduler'] = hr_report_scheduler
+        logger.info("✅ Scheduler перевірки звітів HR запущено")
+    except Exception as e:
+        logger.error(f"❌ Помилка запуску HR report scheduler: {e}")
+    
+    # Запускаємо scheduler для щоденних звітів по вакансіях
+    try:
+        from schedulers.daily_vacancy_report import setup_daily_vacancy_report_scheduler
+        vacancy_report_scheduler = await setup_daily_vacancy_report_scheduler(application)
+        application.bot_data['vacancy_report_scheduler'] = vacancy_report_scheduler
+        logger.info("✅ Scheduler щоденних звітів по вакансіях запущено")
+    except Exception as e:
+        logger.error(f"❌ Помилка запуску vacancy report scheduler: {e}")
+    
+    # Запускаємо scheduler для перевірки неактивних топіків
+    try:
+        setup_inactive_topics_scheduler(application)
+        logger.info("✅ Scheduler перевірки неактивних топіків запущено")
+    except Exception as e:
+        logger.error(f"❌ Помилка запуску inactive topics scheduler: {e}")
+    
+    # Запускаємо scheduler для перевірки активності вакансій
+    try:
+        setup_vacancy_activity_scheduler(application)
+        logger.info("✅ Scheduler перевірки активності вакансій запущено")
+    except Exception as e:
+        logger.error(f"❌ Помилка запуску vacancy activity scheduler: {e}")
+
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -131,10 +216,25 @@ def main():
         application.add_handler(CommandHandler("yesterday", yesterday_command))
         application.add_handler(CommandHandler("report", report_command))
         application.add_handler(CommandHandler("my_report", my_report_command))
+        application.add_handler(CommandHandler("diff", diff_command))
+        application.add_handler(CommandHandler("hr_diff", hr_diff_command))
+        application.add_handler(CommandHandler("mark_report", mark_report_command))
+        application.add_handler(CommandHandler("report_status", report_status_command))
         application.add_handler(CommandHandler("cache_info", cache_info_command))
         application.add_handler(CommandHandler("clear_cache", clear_cache_command))
         application.add_handler(CommandHandler("vacancies", list_vacancies_command))
         application.add_handler(CommandHandler("vacancy_analytics", vacancy_analytics_command))
+        application.add_handler(CommandHandler("vacancy_progress", vacancy_progress_command))
+        application.add_handler(CommandHandler("vacancy_stagnant", vacancy_stagnant_command))
+        application.add_handler(CommandHandler("funnel_health", funnel_health_command))
+        application.add_handler(CommandHandler("track_changes", track_changes_command))
+        application.add_handler(CommandHandler("register_topic", register_topic_command))
+        application.add_handler(CommandHandler("topic_stats", topic_stats_command))
+        application.add_handler(CommandHandler("inactive_topics", inactive_topics_command))
+        application.add_handler(CommandHandler("topic_info", topic_info_command))
+        application.add_handler(CommandHandler("list_topics", list_topics_command))
+        application.add_handler(CommandHandler("vacancy_activity", vacancy_activity_command))
+        application.add_handler(CommandHandler("vacancies_no_calls", vacancies_no_calls_command))
         
         # Реєструємо обробники callback (для inline кнопок)
         application.add_handler(CallbackQueryHandler(
@@ -146,6 +246,15 @@ def main():
         # MessageHandler повинен бути ОСТАННІМ, щоб команди оброблялись першими
         async def message_handler_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """Обгортка для обробника повідомлень з перевіркою топіку"""
+            # Спочатку відстежуємо активність в топіку
+            if update.message and update.message.is_topic_message:
+                tracker = context.bot_data.get('topic_tracker')
+                if tracker and not update.message.from_user.is_bot:
+                    thread_id = update.message.message_thread_id
+                    user_id = update.message.from_user.id
+                    username = update.message.from_user.username
+                    tracker.update_activity(thread_id, user_id, username)
+            
             # Перевіряємо доступ до групи та топіку
             allowed_groups = Config.get_allowed_group_ids()
             allowed_topics = Config.get_allowed_topic_ids()
@@ -175,6 +284,12 @@ def main():
                     return
             
             # Якщо перевірки пройдені - обробляємо повідомлення
+            
+            # Перевіряємо чи це схоже на звіт HR
+            from bot.handlers import is_likely_report, mark_hr_report_received
+            if message.text and is_likely_report(message.text):
+                await mark_hr_report_received(update, context)
+            
             conversation_handler = context.bot_data.get('conversation_handler')
             if conversation_handler:
                 await conversation_handler.handle_message(update, context)

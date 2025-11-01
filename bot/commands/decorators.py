@@ -9,6 +9,48 @@ from core.config import Config
 logger = create_logger(__name__)
 
 
+def require_admin(func):
+    """Декоратор для перевірки що команду виконує адміністратор"""
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user = update.effective_user
+        if not user:
+            await update.message.reply_text("❌ Не вдалося визначити користувача")
+            return
+        
+        # Отримуємо ID адміністратора з конфігу
+        admin_chat_id = Config.ADMIN_CHAT_ID
+        
+        # Якщо не налаштовано - дозволяємо всім (для розробки)
+        if not admin_chat_id:
+            logger.warning("ADMIN_CHAT_ID не налаштовано - команда доступна всім")
+            return await func(update, context)
+        
+        # Перевіряємо чи користувач є адміном
+        try:
+            admin_id = int(admin_chat_id)
+            if user.id != admin_id:
+                logger.warning(f"Доступ заборонено: користувач {user.id} спробував виконати адмін-команду")
+                await update.message.reply_text(
+                    "❌ Доступ заборонено\n\n"
+                    "Ця команда доступна лише адміністраторам."
+                )
+                return
+        except ValueError:
+            logger.error(f"Невірний формат ADMIN_CHAT_ID: {admin_chat_id}")
+            await update.message.reply_text("❌ Помилка конфігурації")
+            return
+        
+        # Користувач - адмін, виконуємо команду
+        return await func(update, context)
+    
+    return wrapper
+
+
+# Alias для сумісності
+admin_only = require_admin
+
+
 def require_group_topic(func):
     """Декоратор для перевірки що команда виконується в дозволеній групі/топіку"""
     @wraps(func)

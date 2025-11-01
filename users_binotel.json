@@ -1,0 +1,74 @@
+{
+    "status": "success",
+    "callDetails": {
+        "6152457991": {
+            "companyID": "35523",
+            "generalCallID": "6152457991",
+            "callID": "6152457991",
+            "startTime": "1761903207",
+            "callType": "0",
+            "internalNumber": "961",
+            "internalAdditionalData": "811 > ",
+            "externalNumber": "0662600297",
+            "waitsec": "5",
+            "billsec": "43",
+            "disposition": "ANSWER",
+            "recordingStatus": "uploaded",
+            "isNewCall": "0",
+            "whoHungUp": "",
+            "customerData": "",
+            "employeeData": {
+                "name": "Рекрутер Вікторія"
+            },
+            "pbxNumberData": {
+                "number": "0959072660",
+                "name": "Відділ рекрутингу"
+            },
+            "historyData": [
+                {
+                    "waitsec": "5",
+                    "billsec": "43",
+                    "disposition": "ANSWER",
+                    "internalNumber": "811 > 961",
+                    "internalAdditionalData": "",
+                    "employeeData": {
+                        "name": "Рекрутер Вікторія"
+                    }
+                }
+            ]
+        },
+        "6152451015": {
+            "companyID": "35523",
+            "generalCallID": "6152451015",
+            "callID": "6152451015",
+            "startTime": "1761903110",
+            "callType": "1",
+            "internalNumber": "961",
+            "internalAdditionalData": "",
+            "externalNumber": "0662600297",
+            "waitsec": "13",
+            "billsec": "0",
+            "disposition": "CONGESTION",
+            "recordingStatus": "",
+            "isNewCall": "0",
+            "whoHungUp": "",
+            "customerData": "",
+            "employeeData": {
+                "name": "Рекрутер Вікторія"
+            },
+            "pbxNumberData": {
+                "number": "0959072660"
+            },
+            "historyData": [
+                {
+                    "waitsec": "13",
+                    "billsec": "0",
+                    "disposition": "CONGESTION",
+                    "pbxNumberData": {
+                        "number": "0959072660"
+                    }
+                }
+            ]
+        }
+    }
+}

@@ -51,13 +51,13 @@ class HurmaService:
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             }
-        elif api_key:
-            # Використовуємо API ключ
-            self.headers = {
-                "token": f"{api_key}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            }
+        # elif api_key:
+        #     # Використовуємо API ключ
+        #     self.headers = {
+        #         "token": f"{api_key}",
+        #         "Content-Type": "application/json",
+        #         "Accept": "application/json",
+        #     }
         else:
             raise ValueError(
                 "Потрібно вказати або api_key, або OAuth credentials (client_id, client_secret, username, password)"
@@ -216,7 +216,21 @@ class HurmaService:
 
         logger.info(f"Getting candidates list with params: {params}")
         return self._make_request("GET", "/candidates", params=params)
+    def get_candidate_by_id(self, candidate_id: str) -> Dict[str, Any]:
+        """
+        Отримання даних конкретного кандидата за ID.
 
+        Args:
+            candidate_id: ID кандидата
+
+        Returns:
+            Словник з даними кандидата
+        """
+        logger.info(f"Getting candidate by ID: {candidate_id}")
+        return self._make_request(
+            "GET",
+            f"/candidates/{candidate_id}",
+        )
     def stage(
         self, parent_stage_id: int = None, page: int = 1, per_page: int = 50
     ) -> List[Dict[str, Any]]:

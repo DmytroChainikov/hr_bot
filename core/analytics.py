@@ -1,6 +1,6 @@
 """Модуль аналітики для HR бота"""
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from collections import defaultdict
 import json
 import os
@@ -9,6 +9,9 @@ from core.logger_settings import create_logger
 from core.config import Config
 from services.hurma_service import HurmaService
 from services.binotel_service import BinotelService
+
+if TYPE_CHECKING:
+    from core.config import HRInfo
 
 logger = create_logger(__name__)
 
@@ -438,6 +441,11 @@ class AnalyticsService:
                 )
                 if updated_details:
                     reports.append(updated_details)
+            
+            # Порівняння дзвінків Binotel з даними Hurma
+            phone_comparison_report = self._get_phone_comparison_for_all_hrs(report_date, hrs)
+            if phone_comparison_report:
+                reports.append(phone_comparison_report)
             
             return reports
             
@@ -1260,3 +1268,383 @@ class AnalyticsService:
             })
         
         return sorted(result, key=lambda x: x['name'])
+    
+    def _normalize_phone_number(self, phone: str) -> str:
+        """
+        Нормалізація номера телефону до стандартного формату
+        
+        Args:
+            phone: Номер телефону в будь-якому форматі
+            
+        Returns:
+            Нормалізований номер (тільки цифри)
+        """
+        if not phone:
+            return ""
+        
+        # Видаляємо всі нецифрові символи
+        normalized = ''.join(filter(str.isdigit, phone))
+        
+        # Видаляємо міжнародні префікси для України
+        if normalized.startswith('380'):
+            normalized = '0' + normalized[3:]
+        elif normalized.startswith('38'):
+            normalized = '0' + normalized[2:]
+        
+        return normalized
+    
+    def _get_phone_numbers_from_candidate(self, candidate: Dict[str, Any]) -> List[str]:
+        """
+        Отримати всі номери телефонів кандидата
+        
+        Args:
+            candidate: Дані кандидата з Hurma
+            
+        Returns:
+            Список нормалізованих номерів телефонів
+        """
+        phone_numbers = []
+        
+        # Отримуємо phone_numbers з даних кандидата
+        phones = candidate.get('phone_numbers', [])
+        
+        if isinstance(phones, list):
+            for phone in phones:
+                normalized = self._normalize_phone_number(phone)
+                if normalized:
+                    phone_numbers.append(normalized)
+        
+        return phone_numbers
+    
+    def _compare_binotel_hurma_phones(
+        self, 
+        hr_name: str, 
+        hr_info: 'HRInfo',
+        report_date: date
+    ) -> Dict[str, Any]:
+        """
+        Порівняти дзвінки з Binotel з кандидатами в Hurma по номерах телефонів
+        
+        Args:
+            hr_name: Ім'я HR
+            hr_info: Інформація про HR (включає binotel_internal)
+            report_date: Дата звіту
+            
+        Returns:
+            Словник з результатами порівняння
+        """
+        try:
+            # Отримуємо дзвінки HR за день
+            date_from = datetime.combine(report_date, datetime.min.time())
+            date_to = datetime.combine(report_date, datetime.max.time())
+            
+            binotel_data = self.binotel.get_calls_by_internal_number(
+                internal_number=hr_info.binotel_internal,
+                date_from=date_from,
+                date_to=date_to
+            )
+            
+            if binotel_data.get('status') != 'success':
+                logger.warning(f"Не вдалося отримати дзвінки для {hr_name}")
+                return {
+                    'total_calls': 0,
+                    'unique_numbers': [],
+                    'matched_candidates': [],
+                    'unmatched_numbers': []
+                }
+            
+            # Збираємо унікальні зовнішні номери з дзвінків
+            call_details = binotel_data.get('callDetails', {})
+            external_numbers = set()
+            
+            # Перевіряємо чи callDetails - це словник чи список
+            if isinstance(call_details, dict):
+                for call_id, call_data in call_details.items():
+                    external_number = call_data.get('externalNumber', '')
+                    if external_number:
+                        normalized = self._normalize_phone_number(external_number)
+                        if normalized:
+                            external_numbers.add(normalized)
+            elif isinstance(call_details, list):
+                for call_data in call_details:
+                    external_number = call_data.get('externalNumber', '')
+                    if external_number:
+                        normalized = self._normalize_phone_number(external_number)
+                        if normalized:
+                            external_numbers.add(normalized)
+            
+            # Отримуємо всіх кандидатів
+            all_candidates = self._get_all_candidates()
+            
+            # Створюємо словник: номер телефону -> кандидат
+            phone_to_candidate = {}
+            for candidate in all_candidates:
+                candidate_phones = self._get_phone_numbers_from_candidate(candidate)
+                for phone in candidate_phones:
+                    if phone not in phone_to_candidate:
+                        phone_to_candidate[phone] = []
+                    phone_to_candidate[phone].append(candidate)
+            
+            # Знаходимо збіги
+            matched_candidates = []
+            unmatched_numbers = []
+            
+            for phone in external_numbers:
+                if phone in phone_to_candidate:
+                    for candidate in phone_to_candidate[phone]:
+                        matched_candidates.append({
+                            'phone': phone,
+                            'candidate_name': candidate.get('name') or candidate.get('specialization') or 'Без імені',
+                            'candidate_id': candidate.get('id'),
+                            'recruiter': candidate.get('responsible_recruiter', {}).get('name', 'Не вказано'),
+                            'job_openings': candidate.get('job_openings', [])
+                        })
+                else:
+                    unmatched_numbers.append(phone)
+            
+            # Підраховуємо кількість дзвінків залежно від типу даних
+            total_calls = len(call_details) if isinstance(call_details, (dict, list)) else 0
+            
+            return {
+                'total_calls': total_calls,
+                'unique_numbers': list(external_numbers),
+                'unique_numbers_count': len(external_numbers),
+                'matched_candidates': matched_candidates,
+                'matched_count': len(matched_candidates),
+                'unmatched_numbers': unmatched_numbers,
+                'unmatched_count': len(unmatched_numbers)
+            }
+            
+        except Exception as e:
+            logger.error(f"Помилка порівняння даних Binotel та Hurma для {hr_name}: {e}")
+            return {
+                'total_calls': 0,
+                'unique_numbers': [],
+                'matched_candidates': [],
+                'unmatched_numbers': [],
+                'error': str(e)
+            }
+    
+    def _format_phone_comparison_report(
+        self,
+        hr_name: str,
+        comparison_data: Dict[str, Any]
+    ) -> str:
+        """
+        Форматувати звіт порівняння телефонів Binotel та Hurma
+        
+        Args:
+            hr_name: Ім'я HR
+            comparison_data: Дані порівняння
+            
+        Returns:
+            Форматований текст звіту
+        """
+        if comparison_data.get('error'):
+            return f"❌ Помилка отримання даних: {comparison_data['error']}\n"
+        
+        total_calls = comparison_data.get('total_calls', 0)
+        unique_count = comparison_data.get('unique_numbers_count', 0)
+        matched_count = comparison_data.get('matched_count', 0)
+        unmatched_count = comparison_data.get('unmatched_count', 0)
+        
+        if total_calls == 0:
+            return ""
+        
+        report = f"\n<b>📱 Аналіз дзвінків - {hr_name}:</b>\n"
+        report += f"  Всього дзвінків: {total_calls}\n"
+        report += f"  Унікальних номерів: {unique_count}\n"
+        report += f"  ✅ Знайдено в Hurma: {matched_count}\n"
+        report += f"  ❓ Не знайдено в Hurma: {unmatched_count}\n"
+        
+        # Показуємо співпадіння (максимум 5)
+        matched_candidates = comparison_data.get('matched_candidates', [])
+        if matched_candidates:
+            report += f"\n  <b>Знайдені кандидати:</b>\n"
+            for i, match in enumerate(matched_candidates[:5], 1):
+                name = match['candidate_name']
+                recruiter = match['recruiter']
+                phone_last4 = match['phone'][-4:] if len(match['phone']) >= 4 else match['phone']
+                report += f"    {i}. {name} (***{phone_last4})"
+                if recruiter != hr_name:
+                    report += f" ⚠️ HR: {recruiter}"
+                report += "\n"
+            
+            if len(matched_candidates) > 5:
+                report += f"    ... та ще {len(matched_candidates) - 5}\n"
+        
+        # Показуємо незнайдені номери (максимум 3)
+        unmatched_numbers = comparison_data.get('unmatched_numbers', [])
+        if unmatched_numbers:
+            report += f"\n  <b>⚠️ Номери відсутні в Hurma:</b>\n"
+            for i, phone in enumerate(unmatched_numbers[:3], 1):
+                phone_last4 = phone[-4:] if len(phone) >= 4 else phone
+                report += f"    {i}. ***{phone_last4}\n"
+            
+            if len(unmatched_numbers) > 3:
+                report += f"    ... та ще {len(unmatched_numbers) - 3}\n"
+        
+        return report
+    
+    def _get_phone_comparison_for_all_hrs(
+        self,
+        report_date: date,
+        hrs: List['HRInfo']
+    ) -> str:
+        """
+        Отримати порівняння дзвінків Binotel та Hurma для всіх HR
+        
+        Args:
+            report_date: Дата звіту
+            hrs: Список HR
+            
+        Returns:
+            Форматований звіт порівняння
+        """
+        try:
+            report = (
+                f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"<b>📱 Порівняння Binotel ↔️ Hurma</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+            )
+            
+            has_data = False
+            
+            for hr in hrs:
+                if not hr.binotel_internal:
+                    continue
+                
+                comparison_data = self._compare_binotel_hurma_phones(
+                    hr.name,
+                    hr,
+                    report_date
+                )
+                
+                hr_report = self._format_phone_comparison_report(hr.name, comparison_data)
+                if hr_report:
+                    report += hr_report
+                    has_data = True
+            
+            if not has_data:
+                return ""
+            
+            return report
+            
+        except Exception as e:
+            logger.error(f"Помилка формування звіту порівняння телефонів: {e}")
+            return ""
+    
+    async def get_analytics_for_date(
+        self,
+        target_date: date,
+        hr_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Отримати аналітичні дані за дату для порівняння зі звітом HR
+        
+        Args:
+            target_date: Дата для аналізу
+            hr_id: ID HR в Hurma (опціонально, для фільтрації)
+            
+        Returns:
+            Словник з даними системи
+        """
+        try:
+            # Отримуємо кандидатів за дату
+            all_candidates = self._get_all_candidates()
+            created_candidates = self._filter_candidates_by_date(all_candidates, target_date, 'created_at')
+            updated_candidates = self._filter_candidates_by_date(all_candidates, target_date, 'updated_at')
+            
+            # Фільтруємо по HR якщо вказано
+            if hr_id:
+                created_candidates = [
+                    c for c in created_candidates
+                    if c.get('responsible_recruiter', {}).get('id') == hr_id
+                ]
+                updated_candidates = [
+                    c for c in updated_candidates
+                    if c.get('responsible_recruiter', {}).get('id') == hr_id
+                ]
+            
+            # Отримуємо дзвінки
+            calls_data = self._get_calls_for_date(target_date)
+            
+            # Формуємо дані
+            system_data = {
+                'date': target_date.strftime('%d.%m.%Y'),
+                'candidates_created': len(created_candidates),
+                'candidates_updated': len(updated_candidates),
+                'total_calls': calls_data.get('total_calls', 0),
+                'candidates_created_list': [
+                    {
+                        'name': c.get('name') or c.get('specialization', 'Без імені'),
+                        'vacancy': [jo.get('jobopening_id') for jo in c.get('job_openings', [])],
+                        'stage': self._get_vacancy_info_from_job_openings(c).get('stage_name', 'Не вказано')
+                    }
+                    for c in created_candidates[:10]  # Перші 10
+                ],
+                'candidates_updated_list': [
+                    {
+                        'name': c.get('name') or c.get('specialization', 'Без імені'),
+                        'vacancy': [jo.get('jobopening_id') for jo in c.get('job_openings', [])],
+                        'stage': self._get_vacancy_info_from_job_openings(c).get('stage_name', 'Не вказано')
+                    }
+                    for c in updated_candidates[:10]  # Перші 10
+                ]
+            }
+            
+            # Додаємо інформацію про дзвінки по HR якщо є
+            if hr_id:
+                hr_calls = calls_data.get('hr_calls', {})
+                # Знаходимо ім'я HR
+                hrs = Config.get_hrs()
+                hr_name = None
+                for hr in hrs:
+                    if hr.hurma_id == hr_id:
+                        hr_name = hr.name
+                        system_data['hr_calls'] = hr_calls.get(hr_name, 0)
+                        break
+            
+            # Додаємо інформацію про активні вакансії (для перевірки чи HR згадав всі)
+            try:
+                from core.vacancy_analytics import VacancyAnalytics
+                vacancy_analytics = VacancyAnalytics(self.hurma, self.binotel)
+                
+                active_vacancies = vacancy_analytics.get_active_vacancies()
+                
+                # Формуємо список вакансій з кандидатами
+                vacancies_with_candidates = []
+                for vac in active_vacancies:
+                    candidates = vacancy_analytics.get_vacancy_candidates_count(vac['id'])
+                    total = candidates.get('__total__', 0)
+                    
+                    if total > 0:
+                        vacancies_with_candidates.append({
+                            'id': vac['id'],
+                            'name': vac.get('name', 'Unknown'),
+                            'candidates_count': total
+                        })
+                
+                system_data['active_vacancies_count'] = len(active_vacancies)
+                system_data['vacancies_with_candidates'] = vacancies_with_candidates
+                
+            except Exception as e:
+                logger.warning(f"Не вдалося отримати дані про вакансії: {e}")
+                system_data['active_vacancies_count'] = 0
+                system_data['vacancies_with_candidates'] = []
+            
+            return system_data
+            
+        except Exception as e:
+            logger.error(f"Помилка отримання аналітичних даних: {e}")
+            return {
+                'date': target_date.strftime('%d.%m.%Y'),
+                'candidates_created': 0,
+                'candidates_updated': 0,
+                'total_calls': 0,
+                'error': str(e)
+            }
+            if len(unmatched_numbers) > 3:
+                report += f"    ... та ще {len(unmatched_numbers) - 3}\n"
+        
+        return report

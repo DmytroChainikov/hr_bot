@@ -1,0 +1,72 @@
+{
+  "user_id": 123456789,
+  "user_name": "Unknown",
+  "created_at": "2025-10-31T16:01:21.727453",
+  "last_interaction": "2025-10-31T16:01:21.727453",
+  "metadata": {
+    "name": "TestUser",
+    "first_interaction": "2025-10-31T16:01:16.153494",
+    "message_count": 4,
+    "last_message": "Як справи з вакансією номер 84?",
+    "context_info": null,
+    "last_interaction": "2025-10-31T16:01:21.727453"
+  },
+  "history": [
+    {
+      "role": "user",
+      "parts": [
+        "Скільки у нас зараз активних вакансій?"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    },
+    {
+      "role": "model",
+      "parts": [
+        "{\"function_call\": \"get_active_vacancies\", \"arguments\": {}}"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    },
+    {
+      "role": "user",
+      "parts": [
+        "Скільки дзвінків було сьогодні на номері 961?"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    },
+    {
+      "role": "model",
+      "parts": [
+        "{\"function_call\": \"get_hr_calls_today\", \"arguments\": {\"hr_internal_number\": \"961\"}}"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    },
+    {
+      "role": "user",
+      "parts": [
+        "Є вакансії які застояли без активності?"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    },
+    {
+      "role": "model",
+      "parts": [
+        "{\"function_call\": \"get_inactive_vacancies\", \"arguments\": {\"days_threshold\": 3}}"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    },
+    {
+      "role": "user",
+      "parts": [
+        "Як справи з вакансією номер 84?"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    },
+    {
+      "role": "model",
+      "parts": [
+        "{\"function_call\": \"get_vacancy_activity\", \"arguments\": {\"vacancy_id\": \"84\", \"days\": 7}}"
+      ],
+      "timestamp": "2025-10-31T16:01:21.727453"
+    }
+  ]
+}

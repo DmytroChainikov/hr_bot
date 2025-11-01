@@ -9,14 +9,15 @@ load_dotenv()
 
 class HRInfo:
     """Інформація про HR"""
-    def __init__(self, name: str, username: str, hurma_id: int, binotel_internal: str):
+    def __init__(self, name: str, username: str, telegram_id: Optional[int], hurma_id: int, binotel_internal: str):
         self.name = name
         self.username = username
+        self.telegram_id = telegram_id
         self.hurma_id = hurma_id
         self.binotel_internal = binotel_internal
     
     def __repr__(self):
-        return f"HRInfo(name={self.name}, hurma_id={self.hurma_id}, binotel={self.binotel_internal})"
+        return f"HRInfo(name={self.name}, telegram_id={self.telegram_id}, hurma_id={self.hurma_id}, binotel={self.binotel_internal})"
 
 
 class Config:
@@ -92,18 +93,37 @@ class Config:
         if cls.HRS_RAW:
             for hr_str in cls.HRS_RAW.split(","):
                 parts = hr_str.strip().split("/")
-                if len(parts) == 4:
+                if len(parts) == 5:  # Name/username/telegram_id/HURMA_USER_ID/BINOTEL_INTERNAL_NUMBER
+                    name, username, telegram_id, hurma_id, binotel_internal = parts
+                    
+                    # Парсимо telegram_id (може бути пустим або 'none')
+                    tg_id = None
+                    if telegram_id and telegram_id.lower() not in ['none', '']:
+                        try:
+                            tg_id = int(telegram_id.strip())
+                        except ValueError:
+                            pass
+                    
+                    hrs.append(HRInfo(
+                        name=name.strip(),
+                        username=username.strip(),
+                        telegram_id=tg_id,
+                        hurma_id=int(hurma_id.strip()),
+                        binotel_internal=binotel_internal.strip()
+                    ))
+                elif len(parts) == 4:  # Старий формат без telegram_id
                     name, username, hurma_id, binotel_internal = parts
                     hrs.append(HRInfo(
                         name=name.strip(),
                         username=username.strip(),
+                        telegram_id=None,
                         hurma_id=int(hurma_id.strip()),
                         binotel_internal=binotel_internal.strip()
                     ))
         return hrs
     
     @classmethod
-    def get_hr_by_hurma_id(cls, hurma_id: int) -> HRInfo:
+    def get_hr_by_hurma_id(cls, hurma_id: int) -> Optional[HRInfo]:
         """Отримання HR за ID в Hurma"""
         for hr in cls.get_hrs():
             if hr.hurma_id == hurma_id:
@@ -111,7 +131,15 @@ class Config:
         return None
     
     @classmethod
-    def get_hr_by_name(cls, name: str) -> HRInfo:
+    def get_hr_by_telegram_id(cls, telegram_id: int) -> Optional[HRInfo]:
+        """Отримання HR за Telegram ID"""
+        for hr in cls.get_hrs():
+            if hr.telegram_id == telegram_id:
+                return hr
+        return None
+    
+    @classmethod
+    def get_hr_by_name(cls, name: str) -> Optional[HRInfo]:
         """Отримання HR за ім'ям"""
         for hr in cls.get_hrs():
             if hr.name.lower() == name.lower():
